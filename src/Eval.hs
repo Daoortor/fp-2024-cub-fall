@@ -1,7 +1,8 @@
-module Eval (evalExpr) where
+module Eval (evalExpr, CalcState) where
 
 import Expr
 import qualified Data.Map.Strict as M
+import qualified Control.Monad.Trans.State.Strict as T
 
 type CalcState = M.Map String Double
 
@@ -25,15 +26,22 @@ safePow x y | x == 0 && y <= 0 = Left $ ZeroNonPositivePow y
             | x < 0 && (y < 0 || y /= fromIntegral (floor y :: Integer)) = Left $ NegNonNaturalPow x y
             | otherwise = Right $ x ** y
 
-evalExpr :: CalcState -> Expr -> Either EvalError Double
-evalExpr _ (Num x) = Right x
-evalExpr state expr@(Var var) = case M.lookup var state of
-    Nothing -> Left $ EvalError (UnknownVariable var) expr
-    Just value -> Right value
-evalExpr state (Plus x y) = evalBinary (wrap (+)) (evalExpr state x) (evalExpr state y)
-evalExpr state (Minus x y) = evalBinary (wrap (-)) (evalExpr state x) (evalExpr state y)
-evalExpr state (Mult x y) = evalBinary (wrap (*)) (evalExpr state x) (evalExpr state y)
-evalExpr state expr@(Div x y) = evalBinary (addContext expr safeDiv) (evalExpr state x) (evalExpr state y)
-evalExpr state expr@(Pow x y) = evalBinary (addContext expr safePow) (evalExpr state x) (evalExpr state y)
-evalExpr state (Abs x) = evalBinary (wrap (flip $ const abs)) (evalExpr state x) (Right 0)
-evalExpr state (UnaryMinus x) = evalBinary (wrap (flip $ const negate)) (evalExpr state x) (Right 0)
+evalBinop :: (Double -> Double -> Either EvalError Double) -> Expr -> Expr -> T.State CalcState (Either EvalError Double)
+evalBinop op x y = T.gets $ \s -> evalBinary op (T.evalState (evalExpr x) s) (T.evalState (evalExpr y) s)
+
+evalUnop :: (Double -> Double) -> Expr -> T.State CalcState (Either EvalError Double)
+evalUnop op x = T.gets $ \s -> evalBinary (wrap (flip $ const op)) (T.evalState (evalExpr x) s) (Right 0)
+
+evalExpr :: Expr -> T.State CalcState (Either EvalError Double)
+evalExpr (Num x) = return $ Right x
+evalExpr expr@(Var var) = T.gets $ \s ->
+    case M.lookup var s of
+        Nothing -> Left $ EvalError (UnknownVariable var) expr
+        Just value -> Right value
+evalExpr (Plus x y) = evalBinop (wrap (+)) x y
+evalExpr (Minus x y) = evalBinop (wrap (-)) x y
+evalExpr (Mult x y) = evalBinop (wrap (*)) x y
+evalExpr expr@(Div x y) = evalBinop (addContext expr safeDiv) x y
+evalExpr expr@(Pow x y) = evalBinop (addContext expr safePow) x y
+evalExpr (Abs x) = evalUnop abs x
+evalExpr (UnaryMinus x) = evalUnop negate x

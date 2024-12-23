@@ -85,8 +85,8 @@ evalCommand input = let parseResult = parseExpr input in
     case parseResult of
         Left parseError -> printREPL $ "Parse error: " ++ show parseError
         Right expr -> do
-            state <- T.get
-            case evalExpr state expr of
+            result <- T.gets $ T.evalState (evalExpr expr)
+            case result of
                 Left e -> printREPL $ show e
                 Right x -> do
                     T.modify (M.insert "ans" x)

@@ -11,6 +11,10 @@ import Expr
 import Eval
 import Parser
 import TestUtil (genExpr, genVars)
+import qualified Control.Monad.Trans.State.Strict as T
+
+getEvalExpr :: CalcState -> Expr -> Either EvalError Double
+getEvalExpr s e = T.evalState (evalExpr e) s
 
 main :: IO ()
 main = defaultMain $ testGroup "all-tests" tests
@@ -24,13 +28,13 @@ tests =
 unitTests :: [TestTree]
 unitTests = [
     testCase "Eval simple addition" $
-        evalExpr M.empty (Plus (Num 1) (Num 2)) @?= Right 3.0
+        getEvalExpr M.empty (Plus (Num 1) (Num 2)) @?= Right 3.0
 
     , testCase "Eval variable lookup" $
-        evalExpr (M.fromList [("x", 5)]) (Plus (Var "x") (Num 3)) @?= Right 8.0
+        getEvalExpr (M.fromList [("x", 5)]) (Plus (Var "x") (Num 3)) @?= Right 8.0
 
     , testCase "Eval division by zero" $
-        evalExpr M.empty (Div (Num 1) (Num 0)) @?= Left (EvalError DivByZero (Div (Num 1) (Num 0)))
+        getEvalExpr M.empty (Div (Num 1) (Num 0)) @?= Left (EvalError DivByZero (Div (Num 1) (Num 0)))
 
     , testCase "Parser parses addition correctly" $
         parseExpr "1 + 2" @?= Right (Plus (Num 1) (Num 2))
@@ -41,10 +45,10 @@ unitTests = [
             Right _ -> assertFailure "Expected parse error"
 
     , testCase "Unary minus evaluates correctly" $
-        evalExpr M.empty (UnaryMinus (Num 5)) @?= Right (-5.0)
+        getEvalExpr M.empty (UnaryMinus (Num 5)) @?= Right (-5.0)
 
     , testCase "Zero raised to non-positive power" $
-        evalExpr M.empty (Pow (Num 0) (Num (-1))) @?= Left (EvalError (ZeroNonPositivePow (-1)) (Pow (Num 0) (Num (-1))))
+        getEvalExpr M.empty (Pow (Num 0) (Num (-1))) @?= Left (EvalError (ZeroNonPositivePow (-1)) (Pow (Num 0) (Num (-1))))
 
     , testCase "Unary minus is equivalent to Haskell unary minus" $
         ((Num (-1000.0)), (Num 0.0)) @?= ((UnaryMinus (Num 1000.0)), (Num 0.0))
@@ -71,15 +75,15 @@ propTests = [
             (varMap, vars) <- forAll genVars
             expr <- forAll (genExpr vars)
             -- round is used to get rid of NaN
-            (round <$> evalExpr varMap expr) === (round <$> evalExpr varMap (either (\e -> error $ show e) id (parseExpr (show expr))))
+            (round <$> getEvalExpr varMap expr) === (round <$> getEvalExpr varMap (either (\e -> error $ show e) id (parseExpr (show expr))))
 
     , testProperty "evalExpr (e1 + e2) == Right (evalExpr e1) + (evalExpr e2)" $
         myProperty $ do
             (varMap, vars) <- forAll genVars
             e1 <- forAll (genExpr vars)
             e2 <- forAll (genExpr vars)
-            case (evalExpr varMap e1, evalExpr varMap e2) of
-                (Right v1, Right v2) -> (round <$> evalExpr varMap (Plus e1 e2)) === (round <$> Right (v1 + v2))
+            case (getEvalExpr varMap e1, getEvalExpr varMap e2) of
+                (Right v1, Right v2) -> (round <$> getEvalExpr varMap (Plus e1 e2)) === (round <$> Right (v1 + v2))
                 _ -> success
 
     , testProperty "evalExpr (e1 - e2) == Right (evalExpr e1) - (evalExpr e2)" $
@@ -87,8 +91,8 @@ propTests = [
             (varMap, vars) <- forAll genVars
             e1 <- forAll (genExpr vars)
             e2 <- forAll (genExpr vars)
-            case (evalExpr varMap e1, evalExpr varMap e2) of
-                (Right v1, Right v2) -> (round <$> evalExpr varMap (Minus e1 e2)) === (round <$> Right (v1 - v2))
+            case (getEvalExpr varMap e1, getEvalExpr varMap e2) of
+                (Right v1, Right v2) -> (round <$> getEvalExpr varMap (Minus e1 e2)) === (round <$> Right (v1 - v2))
                 _ -> success
 
     , testProperty "evalExpr (e1 * e2) == Right (evalExpr e1) * (evalExpr e2)" $
@@ -96,8 +100,8 @@ propTests = [
             (varMap, vars) <- forAll genVars
             e1 <- forAll (genExpr vars)
             e2 <- forAll (genExpr vars)
-            case (evalExpr varMap e1, evalExpr varMap e2) of
-                (Right v1, Right v2) -> (round <$> evalExpr varMap (Mult e1 e2)) === (round <$> Right (v1 * v2))
+            case (getEvalExpr varMap e1, getEvalExpr varMap e2) of
+                (Right v1, Right v2) -> (round <$> getEvalExpr varMap (Mult e1 e2)) === (round <$> Right (v1 * v2))
                 _ -> success
 
     , testProperty "evalExpr (e1 / e2) == Right (evalExpr e1) / (evalExpr e2)" $
@@ -105,8 +109,8 @@ propTests = [
             (varMap, vars) <- forAll genVars
             e1 <- forAll (genExpr vars)
             e2 <- forAll (genExpr vars)
-            case (evalExpr varMap e1, evalExpr varMap e2) of
+            case (getEvalExpr varMap e1, getEvalExpr varMap e2) of
                 (_, Right 0) -> success
-                (Right v1, Right v2) -> (round <$> evalExpr varMap (Div e1 e2)) === (round <$> Right (v1 / v2))
+                (Right v1, Right v2) -> (round <$> getEvalExpr varMap (Div e1 e2)) === (round <$> Right (v1 / v2))
                 _ -> success
     ]
