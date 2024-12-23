@@ -29,6 +29,7 @@ library
   hs-source-dirs:
       src
   exposed-modules:
+      CommandParser
       Eval
       Expr
       Interpreter
@@ -38,9 +39,11 @@ library
   autogen-modules:
       Paths_scientific_calculator
   build-depends:
-      base >=4.7 && <5
+      MissingH
+    , base >=4.7 && <5
     , containers
     , criterion
+    , ghc
     , hedgehog
     , parsec
     , random
@@ -57,9 +60,11 @@ executable scientific-calculator-exe
   autogen-modules:
       Paths_scientific_calculator
   build-depends:
-      base >=4.7 && <5
+      MissingH
+    , base >=4.7 && <5
     , containers
     , criterion
+    , ghc
     , hedgehog
     , parsec
     , random
@@ -80,9 +85,11 @@ test-suite scientific-calculator-test
   autogen-modules:
       Paths_scientific_calculator
   build-depends:
-      base >=4.7 && <5
+      MissingH
+    , base >=4.7 && <5
     , containers
     , criterion
+    , ghc
     , hedgehog
     , parsec
     , random
@@ -106,9 +113,11 @@ benchmark performance
       common
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      MissingH
+    , base >=4.7 && <5
     , containers
     , criterion
+    , ghc
     , hedgehog
     , parsec
     , random

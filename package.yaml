@@ -28,6 +28,8 @@ dependencies:
   - criterion
   - hedgehog
   - random
+  - MissingH
+  - ghc
 
 ghc-options:
   - -Wall
